@@ -11,17 +11,29 @@ A production-ready coal mining concession management system built with:
 
 ```
 coal-chain/
+<<<<<<< HEAD
 ├── contracts/          # Solidity smart contracts
 ├── migrations/         # Truffle migration scripts
 ├── scripts/            # Utility scripts
 ├── backend/            # Express.js API server
+=======
+├── contracts/          
+├── migrations/        
+├── scripts/          
+├── backend/       
+>>>>>>> b79293b (initial clean commit)
 │   ├── server.js       # Main server (< 500 lines)
 │   └── abi/            # Auto-generated after migration
 └── frontend/           # Next.js application
     ├── pages/          # Routes: dashboard, concessions, extractions, blockchain
     ├── components/     # Layout component
+<<<<<<< HEAD
     ├── styles/         # Global CSS
     └── utils/          # API client
+=======
+    ├── styles/        
+    └── utils/         
+>>>>>>> b79293b (initial clean commit)
 ```
 
 ---
@@ -113,7 +125,11 @@ Frontend runs on **http://localhost:3000**
 
 ---
 
+<<<<<<< HEAD
 ## How Proof of Stake Works Here
+=======
+## How Proof of Work Works Here
+>>>>>>> b79293b (initial clean commit)
 
 Ganache simulates Ethereum's **Proof of Work** consensus:
 

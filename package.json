@@ -1,0 +1,23 @@
+{
+  "name": "coal-chain",
+  "version": "1.0.0",
+  "description": "Coal Mining Concession Management System on Blockchain",
+  "scripts": {
+    "compile": "truffle compile",
+    "migrate": "truffle migrate --reset",
+    "setup": "node scripts/setup.js",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "deploy": "npm run migrate && npm run setup",
+    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"yellow,cyan\" \"cd backend && npm run dev\" \"cd frontend && npm run dev\""
+  },
+  "devDependencies": {
+    "@openzeppelin/contracts": "^5.0.1",
+    "concurrently": "^7.6.0",
+    "truffle": "^5.11.5"
+  },
+  "dependencies": {
+    "express": "^4.22.1",
+    "mongoose": "^8.23.0"
+  }
+}

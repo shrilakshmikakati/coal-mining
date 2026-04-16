@@ -113,7 +113,7 @@ Frontend runs on **http://localhost:3000**
 
 ---
 
-## How Proof of Work Works Here
+## How Proof of Stake Works Here
 
 Ganache simulates Ethereum's **Proof of Work** consensus:
 

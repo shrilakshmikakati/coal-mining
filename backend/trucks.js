@@ -40,6 +40,7 @@ const shipmentSchema = new mongoose.Schema({
   origin:            { type: String, required: true },
   destination:       { type: String, required: true },
   sealHash:          { type: String },
+  expectedCoalQuality: { grade: String, moisturePercent: Number, ashPercent: Number, calorificValue: Number },
   status: {
     type: String,
     enum: ["Dispatched", "InTransit", "Flagged", "Delivered", "Seized"],
@@ -181,7 +182,7 @@ router.get("/api/shipments/:id", async (req, res) => {
 
 router.post("/api/shipments", async (req, res) => {
   try {
-    const { concessionId, concessionChainId, truckId, authorizedTons, origin, destination } = req.body;
+    const { concessionId, concessionChainId, truckId, authorizedTons, origin, destination, expectedCoalQuality } = req.body;
     const truck = await Truck.findById(truckId);
     if (!truck) return res.status(404).json({ success: false, error: "Truck not found" });
     if (!truck.active) return res.status(400).json({ success: false, error: "Truck is inactive" });
@@ -200,6 +201,7 @@ router.post("/api/shipments", async (req, res) => {
       origin, destination, sealHash: seal,
       blockchainId, txHash: receipt.transactionHash,
       status: "Dispatched", dispatchedAt: new Date(),
+      expectedCoalQuality
     });
     res.status(201).json({ success: true, data: shipment });
   } catch (e) { err(res, e, "Shipment dispatch failed"); }
@@ -262,6 +264,42 @@ router.post("/api/shipments/:id/depot-scan", async (req, res) => {
 
     const depot = depotId ? await Depot.findById(depotId) : null;
     const label = depot?.name || depotName || "Unknown Depot";
+
+    // ─── Simulated PoS Validator Consensus ───
+    let qualityTampered = false;
+    let tamperingReason = "";
+    if (shipment.expectedCoalQuality && coalQuality) {
+      if (shipment.expectedCoalQuality.grade && coalQuality.grade && shipment.expectedCoalQuality.grade !== coalQuality.grade) {
+        qualityTampered = true;
+        tamperingReason = `Grade changed from ${shipment.expectedCoalQuality.grade} to ${coalQuality.grade}`;
+      } else if (shipment.expectedCoalQuality.moisturePercent && coalQuality.moisturePercent && Math.abs(shipment.expectedCoalQuality.moisturePercent - coalQuality.moisturePercent) > 2) {
+        qualityTampered = true;
+        tamperingReason = `Moisture deviated from ${shipment.expectedCoalQuality.moisturePercent}% to ${coalQuality.moisturePercent}%`;
+      } else if (shipment.expectedCoalQuality.ashPercent && coalQuality.ashPercent && Math.abs(shipment.expectedCoalQuality.ashPercent - coalQuality.ashPercent) > 2) {
+        qualityTampered = true;
+        tamperingReason = `Ash deviated from ${shipment.expectedCoalQuality.ashPercent}% to ${coalQuality.ashPercent}%`;
+      }
+    }
+
+    if (qualityTampered) {
+      const alert = await Alert.create({
+        shipmentId: shipment._id,
+        severity: "Critical",
+        reason: "QUALITY_TAMPERING_DETECTED",
+        expectedTons: shipment.authorizedTons,
+        reportedTons: measuredTons,
+        notes: `Simulated PoS Validators rejected scan at ${label}. Reason: ${tamperingReason}`,
+      });
+      shipment.status = "Flagged";
+      await shipment.save();
+
+      const clients = req.app.locals.sseClients?.[shipment._id.toString()] || [];
+      clients.forEach(c => c.write(`data: ${JSON.stringify({ type: "alert", severity: "Critical", reason: "QUALITY_TAMPERING_DETECTED", diff: 0, depot: label })}\n\n`));
+
+      return res.status(403).json({ success: false, error: "Validators rejected scan due to tampering detection", alert, qualityTampered: true });
+    }
+    // ─────────────────────────────────────────
+
     const tolerance = shipment.authorizedTons * 0.02;
     const tonsMatch = measuredTons >= shipment.authorizedTons - tolerance &&
                       measuredTons <= shipment.authorizedTons + tolerance;

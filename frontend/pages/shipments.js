@@ -10,7 +10,10 @@ const SEVERITY_COLORS = { Low: "active", Medium: "pending", High: "suspended", C
 function DispatchModal({ onClose, onCreated }) {
   const [trucks, setTrucks] = useState([]);
   const [concessions, setConcessions] = useState([]);
-  const [form, setForm] = useState({ concessionId: "", truckId: "", authorizedTons: "", origin: "", destination: "" });
+  const [form, setForm] = useState({ 
+    concessionId: "", truckId: "", authorizedTons: "", origin: "", destination: "",
+    grade: "", moisturePercent: "", ashPercent: "", calorificValue: ""
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -32,6 +35,12 @@ function DispatchModal({ onClose, onCreated }) {
         ...form,
         authorizedTons: +form.authorizedTons,
         concessionChainId: concession.blockchainId,
+        expectedCoalQuality: {
+          grade: form.grade || undefined,
+          moisturePercent: form.moisturePercent ? +form.moisturePercent : undefined,
+          ashPercent: form.ashPercent ? +form.ashPercent : undefined,
+          calorificValue: form.calorificValue ? +form.calorificValue : undefined,
+        }
       });
       onCreated(); onClose();
     } catch (e) { setError(e.response?.data?.error || "Dispatch failed"); }
@@ -74,6 +83,29 @@ function DispatchModal({ onClose, onCreated }) {
             <div className="form-group">
               <label className="form-label">Destination *</label>
               <input className="form-input" value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="Bokaro Steel Plant" />
+            </div>
+          </div>
+          <div style={{ marginTop: 16, borderTop: "1px solid var(--seam)", paddingTop: 16 }}>
+            <div style={{ fontFamily: "Space Mono", fontSize: 11, color: "var(--amber)", textTransform: "uppercase", marginBottom: 8 }}>
+              Baseline Coal Quality (For PoS Verification)
+            </div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">Grade</label>
+                <input className="form-input" value={form.grade} onChange={e => set("grade", e.target.value)} placeholder="e.g. A1" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Moisture %</label>
+                <input className="form-input" type="number" value={form.moisturePercent} onChange={e => set("moisturePercent", e.target.value)} placeholder="5" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Ash %</label>
+                <input className="form-input" type="number" value={form.ashPercent} onChange={e => set("ashPercent", e.target.value)} placeholder="12" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">GCV (kcal/kg)</label>
+                <input className="form-input" type="number" value={form.calorificValue} onChange={e => set("calorificValue", e.target.value)} placeholder="6000" />
+              </div>
             </div>
           </div>
         </div>

@@ -117,11 +117,16 @@ function DepotScanPanel({ shipment, depots, onScanned }) {
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [validatorState, setValidatorState] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const submit = async () => {
     if (!form.measuredTons) return;
-    setLoading(true); setResult(null);
+    setLoading(true); setResult(null); setValidatorState("simulating");
+    
+    // Simulate validator network delay
+    await new Promise(r => setTimeout(r, 1200));
+
     try {
       const r = await depotScan(shipment._id, {
         depotId: form.depotId || undefined,
@@ -135,11 +140,17 @@ function DepotScanPanel({ shipment, depots, onScanned }) {
           calorificValue: form.calorificValue ? +form.calorificValue : undefined,
         }
       });
+      setValidatorState("success");
       setResult(r.data);
       setForm({ depotId: "", measuredTons: "", notes: "", grade: "", moisturePercent: "", ashPercent: "", calorificValue: "" });
       onScanned();
     } catch (e) {
-      setResult({ error: e.response?.data?.error || "Scan failed" });
+      if (e.response?.data?.qualityTampered) {
+        setValidatorState("failed");
+      } else {
+        setValidatorState(null);
+      }
+      setResult({ error: e.response?.data?.error || "Scan failed", isTampered: e.response?.data?.qualityTampered });
     }
     setLoading(false);
   };
@@ -157,7 +168,18 @@ function DepotScanPanel({ shipment, depots, onScanned }) {
             : `⚠ MISMATCH — Diff: ${result.diff > 0 ? "+" : ""}${result.diff?.toFixed(2)}t. Alert raised on blockchain.`}
         </div>
       )}
-      {result?.error && <div className="alert alert-error" style={{ marginBottom: 12, fontSize: 13 }}>✗ {result.error}</div>}
+      {result?.error && (
+        <div className="alert alert-error" style={{ marginBottom: 12, fontSize: 13, background: result.isTampered ? "rgba(244,63,94,0.15)" : undefined, borderColor: result.isTampered ? "var(--rose)" : undefined }}>
+           {result.isTampered ? <strong>🛑 VALIDATOR REJECTION:<br/></strong> : "✗ "}{result.error}
+        </div>
+      )}
+
+      {validatorState === "simulating" && (
+         <div style={{ padding: 12, border: "1px solid var(--seam)", background: "var(--carbon)", borderRadius: 6, marginBottom: 12, fontFamily: "Space Mono", fontSize: 11, color: "var(--amber)" }}>
+           <span className="spinner" style={{ marginRight: 8 }} />
+           Awaiting Validator Nodes Consensus on Quality Details...
+         </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
         <div className="form-group" style={{ marginBottom: 0 }}>

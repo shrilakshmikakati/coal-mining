@@ -159,9 +159,21 @@ app.post("/api/extractions", async (req, res) => {
     if (!doc) return res.status(404).json({ success: false, error: "Concession not found" });
     if (doc.status !== "Active") return res.status(400).json({ success: false, error: "Concession not active" });
     if (!doc.blockchainId) return res.status(400).json({ success: false, error: "Not deployed to blockchain" });
+    
+    if (doc.extractedTons + tons > doc.maxExtractionTons) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Exceeds quota. You tried to extract ${tons}t but only ${doc.maxExtractionTons - doc.extractedTons}t remaining.` 
+      });
+    }
+
+    if (doc.expiresAt && new Date() > new Date(doc.expiresAt)) {
+      return res.status(400).json({ success: false, error: "Concession has expired" });
+    }
+
     const batchId = `BATCH-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const accounts = await web3.eth.getAccounts();
-    const receipt = await contract.methods.recordExtraction(doc.blockchainId, tons, batchId).send({ from: accounts[0], gas: 200000 });
+    const receipt = await contract.methods.recordExtraction(doc.blockchainId, Math.floor(tons), batchId).send({ from: accounts[0], gas: 500000 });
     const extraction = await Extraction.create({
       concessionId: doc._id, blockchainId: doc.blockchainId, batchId,
       tons, coalQuality, txHash: receipt.transactionHash,

@@ -54,6 +54,7 @@ const shipmentSchema = new mongoose.Schema({
     txHash:       String,
     depotId:      { type: mongoose.Schema.Types.ObjectId, ref: "Depot", default: null },
     diff:         Number,
+    coalQuality:  { grade: String, moisturePercent: Number, ashPercent: Number, calorificValue: Number },
   }],
   dispatchedAt: { type: Date, default: Date.now },
   deliveredAt:  Date,
@@ -119,7 +120,7 @@ router.post("/api/trucks/:id/register-chain", async (req, res) => {
     const accounts = await req.app.locals.web3.eth.getAccounts();
     const receipt = await truckContract.methods
       .registerTruck(truck.plateNumber, truck.operatorAddress, truck._id.toString())
-      .send({ from: accounts[0], gas: 300000 });
+      .send({ from: accounts[0], gas: 600000 });
     const blockchainId = Number(receipt.events.TruckRegistered.returnValues.id);
     await truck.updateOne({ blockchainId, txHash: receipt.transactionHash });
     res.json({ success: true, blockchainId, txHash: receipt.transactionHash });
@@ -191,7 +192,7 @@ router.post("/api/shipments", async (req, res) => {
     const accounts = await req.app.locals.web3.eth.getAccounts();
     const receipt = await truckContract.methods
       .dispatchShipment(concessionChainId, truckId.toString(), authorizedTons, origin, destination, seal)
-      .send({ from: accounts[0], gas: 400000 });
+      .send({ from: accounts[0], gas: 600000 });
     const blockchainId = Number(receipt.events.ShipmentDispatched.returnValues.id);
 
     const shipment = await Shipment.create({
@@ -252,7 +253,7 @@ router.get("/api/shipments/:id/live", (req, res) => {
 // ─── Depot Scan ───────────────────────────────────────────────────────────────
 router.post("/api/shipments/:id/depot-scan", async (req, res) => {
   try {
-    const { depotId, measuredTons, depotName, notes } = req.body;
+    const { depotId, measuredTons, depotName, notes, coalQuality } = req.body;
     const shipment = await Shipment.findById(req.params.id)
       .populate("truckId", "plateNumber driverName");
     if (!shipment) return res.status(404).json({ success: false, error: "Shipment not found" });
@@ -268,13 +269,25 @@ router.post("/api/shipments/:id/depot-scan", async (req, res) => {
 
     const { truckContract } = req.app.locals;
     const accounts = await req.app.locals.web3.eth.getAccounts();
+    
+    let formattedNotes = notes || "";
+    if (coalQuality) {
+      const q = [];
+      if (coalQuality.grade) q.push(`Grade: ${coalQuality.grade}`);
+      if (coalQuality.moisturePercent) q.push(`Moisture: ${coalQuality.moisturePercent}%`);
+      if (coalQuality.ashPercent) q.push(`Ash: ${coalQuality.ashPercent}%`);
+      if (coalQuality.calorificValue) q.push(`GCV: ${coalQuality.calorificValue}`);
+      if (q.length > 0) formattedNotes = (formattedNotes ? formattedNotes + " | " : "") + q.join(", ");
+    }
+
     const receipt = await truckContract.methods
-      .recordCheckpoint(shipment.blockchainId, label, measuredTons, notes || "")
-      .send({ from: accounts[0], gas: 300000 });
+      .recordCheckpoint(shipment.blockchainId, label, measuredTons, formattedNotes)
+      .send({ from: accounts[0], gas: 600000 });
 
     shipment.checkpoints.push({
       location: label, reportedTons: measuredTons, tonsMatch,
       notes, txHash: receipt.transactionHash, depotId: depot?._id || null, diff,
+      coalQuality
     });
     shipment.status = "InTransit";
     await shipment.save();
@@ -310,7 +323,7 @@ router.post("/api/shipments/:id/checkpoint", async (req, res) => {
     const accounts = await req.app.locals.web3.eth.getAccounts();
     const receipt = await truckContract.methods
       .recordCheckpoint(shipment.blockchainId, location, reportedTons, notes || "")
-      .send({ from: accounts[0], gas: 300000 });
+      .send({ from: accounts[0], gas: 600000 });
 
     const tolerance = shipment.authorizedTons * 0.02;
     const tonsMatch = reportedTons >= shipment.authorizedTons - tolerance &&
@@ -343,7 +356,7 @@ router.post("/api/shipments/:id/deliver", async (req, res) => {
 
     const { truckContract } = req.app.locals;
     const accounts = await req.app.locals.web3.eth.getAccounts();
-    await truckContract.methods.confirmDelivery(shipment.blockchainId, finalTons).send({ from: accounts[0], gas: 300000 });
+    await truckContract.methods.confirmDelivery(shipment.blockchainId, finalTons).send({ from: accounts[0], gas: 600000 });
 
     const tolerance = shipment.authorizedTons * 0.02;
     const match = finalTons >= shipment.authorizedTons - tolerance && finalTons <= shipment.authorizedTons + tolerance;
@@ -389,7 +402,7 @@ router.patch("/api/alerts/:id/resolve", async (req, res) => {
       const { truckContract } = req.app.locals;
       if (alert.blockchainId) {
         const accounts = await req.app.locals.web3.eth.getAccounts();
-        await truckContract.methods.resolveAlert(alert.blockchainId).send({ from: accounts[0], gas: 100000 });
+        await truckContract.methods.resolveAlert(alert.blockchainId).send({ from: accounts[0], gas: 600000 });
       }
     } catch (_) {}
     res.json({ success: true, data: alert });
@@ -401,10 +414,13 @@ router.post("/api/alerts/manual", async (req, res) => {
     const { shipmentId, severity, reason, notes } = req.body;
     const shipment = await Shipment.findById(shipmentId);
     if (!shipment) return res.status(404).json({ success: false, error: "Shipment not found" });
+    if (!shipment.blockchainId) return res.status(400).json({ success: false, error: "Shipment not deployed to blockchain" });
+    
     const severityMap = { Low: 0, Medium: 1, High: 2, Critical: 3 };
     const { truckContract } = req.app.locals;
     const accounts = await req.app.locals.web3.eth.getAccounts();
-    await truckContract.methods.raiseManualAlert(shipment.blockchainId, severityMap[severity] ?? 2, reason).send({ from: accounts[0], gas: 200000 });
+    await truckContract.methods.raiseManualAlert(shipment.blockchainId, severityMap[severity] ?? 2, reason).send({ from: accounts[0], gas: 600000 });
+    
     if (severity === "Critical") await Shipment.findByIdAndUpdate(shipmentId, { status: "Seized" });
     const alert = await Alert.create({ shipmentId, severity, reason, notes, expectedTons: shipment.authorizedTons });
     res.status(201).json({ success: true, data: alert });

@@ -111,7 +111,10 @@ function TrailMap({ trail, checkpoints, origin, destination }) {
 }
 
 function DepotScanPanel({ shipment, depots, onScanned }) {
-  const [form, setForm] = useState({ depotId: "", measuredTons: "", notes: "" });
+  const [form, setForm] = useState({ 
+    depotId: "", measuredTons: "", notes: "",
+    grade: "", moisturePercent: "", ashPercent: "", calorificValue: "" 
+  });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -125,9 +128,15 @@ function DepotScanPanel({ shipment, depots, onScanned }) {
         measuredTons: +form.measuredTons,
         notes: form.notes,
         depotName: form.depotId ? undefined : "Manual Scan",
+        coalQuality: {
+          grade: form.grade || undefined,
+          moisturePercent: form.moisturePercent ? +form.moisturePercent : undefined,
+          ashPercent: form.ashPercent ? +form.ashPercent : undefined,
+          calorificValue: form.calorificValue ? +form.calorificValue : undefined,
+        }
       });
       setResult(r.data);
-      setForm({ depotId: "", measuredTons: "", notes: "" });
+      setForm({ depotId: "", measuredTons: "", notes: "", grade: "", moisturePercent: "", ashPercent: "", calorificValue: "" });
       onScanned();
     } catch (e) {
       setResult({ error: e.response?.data?.error || "Scan failed" });
@@ -165,6 +174,17 @@ function DepotScanPanel({ shipment, depots, onScanned }) {
             placeholder={`Auth: ${shipment.authorizedTons}t`} />
         </div>
       </div>
+      
+      <div style={{ fontFamily: "Space Mono", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", marginBottom: 8, marginTop: 4 }}>
+        Coal Quality Metrics (Optional)
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <input className="form-input" style={{ fontSize: 12, padding: "6px 10px" }} value={form.grade} onChange={e => set("grade", e.target.value)} placeholder="Grade (e.g. A1)" />
+        <input className="form-input" style={{ fontSize: 12, padding: "6px 10px" }} type="number" value={form.moisturePercent} onChange={e => set("moisturePercent", e.target.value)} placeholder="Moisture %" />
+        <input className="form-input" style={{ fontSize: 12, padding: "6px 10px" }} type="number" value={form.ashPercent} onChange={e => set("ashPercent", e.target.value)} placeholder="Ash %" />
+        <input className="form-input" style={{ fontSize: 12, padding: "6px 10px" }} type="number" value={form.calorificValue} onChange={e => set("calorificValue", e.target.value)} placeholder="GCV (kcal/kg)" />
+      </div>
+
       <div className="form-group" style={{ marginBottom: 12 }}>
         <label className="form-label">Notes</label>
         <input className="form-input" value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Weigh bridge ID, inspector name..." />
@@ -428,6 +448,14 @@ export default function Tracking() {
                           </div>
                           <div style={{ fontSize: 11, color: "var(--muted)" }}>{new Date(cp.scannedAt).toLocaleString()}</div>
                           {cp.notes && <div style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>{cp.notes}</div>}
+                          {cp.coalQuality && (
+                            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+                              {cp.coalQuality.grade && <span className="badge badge-active" style={{ fontSize: 9 }}>{cp.coalQuality.grade}</span>}
+                              {cp.coalQuality.moisturePercent != null && <span style={{ fontSize: 10, color: "var(--muted)" }}>💧 {cp.coalQuality.moisturePercent}%</span>}
+                              {cp.coalQuality.ashPercent != null && <span style={{ fontSize: 10, color: "var(--muted)" }}>🌫 {cp.coalQuality.ashPercent}%</span>}
+                              {cp.coalQuality.calorificValue != null && <span style={{ fontSize: 10, color: "var(--muted)" }}>🔥 {cp.coalQuality.calorificValue} kcal</span>}
+                            </div>
+                          )}
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
                           <div style={{ fontFamily: "Space Mono", fontSize: 13, color: cp.tonsMatch ? "var(--emerald)" : "var(--rose)" }}>

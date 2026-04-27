@@ -166,6 +166,15 @@ function ShipmentDetail({ id, onClose, onRefresh }) {
                       <div>
                         <div style={{ fontWeight: 600, color: "var(--text)" }}>{cp.location}</div>
                         <div style={{ fontSize: 11, color: "var(--muted)" }}>{new Date(cp.scannedAt).toLocaleString()}</div>
+                        {cp.notes && <div style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>{cp.notes}</div>}
+                        {cp.coalQuality && (
+                          <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                            {cp.coalQuality.grade && <span className="badge badge-active" style={{ fontSize: 9 }}>{cp.coalQuality.grade}</span>}
+                            {cp.coalQuality.moisturePercent != null && <span style={{ fontSize: 10, color: "var(--muted)" }}>💧 {cp.coalQuality.moisturePercent}%</span>}
+                            {cp.coalQuality.ashPercent != null && <span style={{ fontSize: 10, color: "var(--muted)" }}>🌫 {cp.coalQuality.ashPercent}%</span>}
+                            {cp.coalQuality.calorificValue != null && <span style={{ fontSize: 10, color: "var(--muted)" }}>🔥 {cp.coalQuality.calorificValue} kcal</span>}
+                          </div>
+                        )}
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontFamily: "Space Mono", fontSize: 13 }}>{cp.reportedTons}t</div>

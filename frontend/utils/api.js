@@ -1,7 +1,8 @@
 import axios from "axios";
 
+const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || (isLocal ? "http://localhost:4000" : "/_/backend"),
   timeout: 30000,
 });
 

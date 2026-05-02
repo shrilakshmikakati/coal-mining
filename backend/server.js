@@ -11,6 +11,26 @@ const app = express();
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
 app.use(express.json());
 
+// Serverless DB & Web3 Connection Middleware
+let isConnected = false;
+async function ensureConnections() {
+  if (!isConnected) {
+    await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/coal_mining");
+    console.log("MongoDB connected");
+    await initWeb3();
+    isConnected = true;
+  }
+}
+
+app.use(async (req, res, next) => {
+  try {
+    await ensureConnections();
+    next();
+  } catch (err) {
+    console.error("Connection error:", err);
+    res.status(500).json({ success: false, error: "Internal connection error" });
+  }
+});
 // Web3 Setup
 const web3 = new Web3(process.env.GANACHE_URL || "http://127.0.0.1:7545");
 const CONTRACT_ABI       = require("./abi/CoalConcession.json");
@@ -233,13 +253,13 @@ app.get("/api/blockchain/info", async (req, res) => {
 // Mount truck router
 app.use(truckRouter);
 
-// Start
-async function start() {
-  await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/coal_mining");
-  console.log("MongoDB connected");
-  await initWeb3();
-  const PORT = process.env.PORT || 4000;
-  app.listen(PORT, () => console.log("Server running on port", PORT));
-}
+// Export for Vercel Serverless
+module.exports = app;
 
-start().catch(console.error);
+// Local Development Fallback
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} (Local Dev Mode)`);
+  });
+}
